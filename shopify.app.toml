@@ -1,0 +1,33 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "03b0ba33fb1153d8789c4dd19b3076fe"
+name = "Custom-Wishlist-App"
+handle = "wishlist-new-4"
+application_url = "https://programming-di-swedish-hey.trycloudflare.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "hatly-wishlist-store.myshopify.com"
+include_config_on_deploy = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "write_products"
+
+[auth]
+redirect_urls = [
+  "https://programming-di-swedish-hey.trycloudflare.com/auth/callback",
+  "https://programming-di-swedish-hey.trycloudflare.com/auth/shopify/callback",
+  "https://programming-di-swedish-hey.trycloudflare.com/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2024-07"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://reduced-officers-environments-fish.trycloudflare.com/webhooks"
+
+[pos]
+embedded = false

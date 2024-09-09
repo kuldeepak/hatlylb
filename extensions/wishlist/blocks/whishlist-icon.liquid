@@ -1,0 +1,249 @@
+<div class="wishlist-inspire__main-icon" x-data="wishlist">
+
+  <button type="button" @click.debounce="addToWishlist()">
+    <svg class="wishlist-inspire__main-icon--svg" viewBox="0 0 24 24" stroke-width="2" stroke="#000" :fill="wishlisted ? '#000' : '#fff'">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.73 2 12.27 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.77-3.4 7.23-8.55 11.53L12 21.35z"/>
+    </svg>
+    {% if block.settings.text != blank %}
+      <span class="wishlist-inspire__main-icon--text">{{ block.settings.text }}</span>
+    {% endif %}
+  </button>
+  
+ 
+</div>
+
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+<script>
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('wishlist', () => ({
+            init() {
+                this.checkIfWishlisted();
+            },
+            wishlisted: false,
+            appUrl: "https://programming-di-swedish-hey.trycloudflare.com/",
+            checkIfWishlisted() {
+                fetch(`${this.appUrl}api/wishlist?customerId={{ customer.id }}&productId={{ product.id }}&shop={{ shop.permanent_domain }}`)
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.data.length > 0) {
+                            const isWishlisted = result.data.some(item => item.productId === "{{ product.id }}");
+                            this.wishlisted = isWishlisted;
+                            this.updateHeaderIcons(); // Call this after fetching status
+                        }
+                    })
+                    .catch(error => console.log('Error fetching wishlist:', error));
+            },
+            addToWishlist() {
+    {% unless customer %}
+    alert('Please login to add to wishlist');
+    return;
+    {% endunless %}
+
+    // Disable the button or prevent multiple clicks
+    if (this.isProcessing) return; 
+    this.isProcessing = true; // Lock the function to prevent duplicate requests
+
+    const formdata = new FormData();
+    formdata.append("customerId", "{{ customer.id }}");
+    formdata.append("productId", "{{ product.id }}");
+    formdata.append("shop", "{{ shop.permanent_domain }}");
+    formdata.append("_action", this.wishlisted ? "DELETE" : "CREATE");
+
+    fetch(`${this.appUrl}api/wishlist`, {
+        method: 'POST',
+        body: formdata,
+        redirect: 'follow'
+    })
+    .then(response => response.json())
+    .then(result => {
+        this.wishlisted = result.wishlisted; // Update wishlisted state correctly
+        this.updateHeaderIcons(); // Call this after updating status
+    })
+    .catch(error => console.log('Error updating wishlist:', error))
+    .finally(() => {
+        this.isProcessing = false; // Unlock the function after request completes
+    });
+},
+
+            updateHeaderIcons() {
+    const headerIcons = document.querySelector('.header__icons');
+   
+
+    let iconDiv = headerIcons.querySelector('.wishlist-inspire__icon');
+    let wishlistCountDiv = headerIcons.querySelector('.wishlist-count');
+
+    if (!iconDiv) {
+        iconDiv = document.createElement('div');
+        iconDiv.classList.add('wishlist-inspire__icon');
+        iconDiv.innerHTML = `
+        <div class="icon">
+            <a href="/pages/wishlist">
+                <svg class="wishlist-inspire__icon--svg" viewBox="0 0 24 24" stroke-width="2" stroke="#000" fill="none">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.73 2 12.27 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.77-3.4 7.23-8.55 11.53L12 21.35z"/>
+                </svg>
+            </a>
+        </div>
+        `;
+        headerIcons.appendChild(iconDiv);
+        console.log('Wishlist icon appended to header');
+    }
+
+    if (!wishlistCountDiv) {
+        wishlistCountDiv = document.createElement('div');
+        wishlistCountDiv.classList.add('wishlist-count');
+        wishlistCountDiv.style.marginLeft = '8px';
+        headerIcons.appendChild(wishlistCountDiv);
+    }
+
+  // Fetch and display the wishlist count
+fetch(`${this.appUrl}api/wishlist?customerId={{ customer.id }}&shop={{ shop.permanent_domain }}`)
+    .then(response => {
+        if (response.ok) {
+            return response.json(); // Parse JSON if response is okay
+        } else {
+            throw new Error('Network response was not ok.');
+        }
+    })
+    .then(result => {
+        // Assuming `result.items` is the array of wishlist items
+        const wishlistItems = result.data || []; // Fallback to an empty array if not present
+        const wishlistCount = wishlistItems.length; // Count the number of items in the array
+        wishlistCountDiv.textContent = wishlistCount; // Update count dynamically
+    })
+    .catch(error => {
+        wishlistCountSpan.textContent = 'Error'; // Optional: show an error state
+        console.log('Error fetching wishlist count:', error.message);
+    });
+
+}
+
+
+        }));
+    });
+</script>
+
+
+
+<style>
+    .wishlist-inspire__main-icon{
+    display: flex;
+    justify-content: center;
+    max-width: 44rem;
+  }
+  .wishlist-inspire__main-icon button{
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .wishlist-inspire__main-icon--svg{
+    width: 2rem;
+    height: 2rem;
+  }
+ div#shopify-block-custom_wishlist_app_whishlist_icon_x4Gpki {
+    display: none;
+}
+  .main-page-title.page-title.h0.scroll-trigger.animate--fade-in {
+    display: none;
+}
+  .wishlist-inspire__icon{
+    display: flex;
+    justify-content: center;
+    max-width: 44rem;
+  }
+  .wishlist-inspire__icon button{
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .wishlist-inspire__icon--svg{
+    width: 2rem;
+    height: 2rem;
+  }
+  .header .header__icons {
+    align-items: center;
+}
+.header .wishlist-inspire__icon {
+    order: 3;
+}
+.header .wishlist-inspire__icon a { 
+    display: grid;
+}
+.header .wishlist-inspire__icon--svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    fill: #fff;
+    vertical-align: middle;
+    stroke-width: 1;
+}
+a#cart-icon-bubble {
+    order: 4;
+}
+
+
+
+.wishlist-count {
+  position: relative;
+  bottom: 13px;
+    content: '';
+    left: 26px;
+    z-index: 4;
+    font-size: 10px;
+    color: #fff;
+    margin-left: 0 !IMPORTANT;  
+    font-weight: 600;
+    line-height: normal;
+}
+.wishlist-count:before {
+    position: absolute;
+    top: -2px;
+    content: '';
+    left: -7px;
+    background-color: #CF112C;
+    padding: 10px;
+    border-radius: 50px;
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    z-index: -1;
+}
+
+</style>
+{% schema %}
+{
+  "name": "Wishlist icon",
+  "target": "section",
+  "settings": [
+    {
+      "type": "product",
+      "id": "product",
+      "label": "product",
+      "autofill": true
+    },
+    {
+      "type": "text",
+      "id": "text",
+      "label": "Text",
+      "default": "Add to wishlist"
+    },
+    {
+      "type": "color",
+      "id": "colour",
+      "label": "Icon Colour",
+      "default": "#ff0000"
+    }
+  ]
+}
+{% endschema %}
+

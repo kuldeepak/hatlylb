@@ -1,0 +1,410 @@
+{% if customer %}
+  
+  <div class="product-wish" x-data="wishlist" x-init="init">
+    <p x-show="wishlistItems.length === 0">Your wishlist is empty.</p>
+    <ul>
+      <template x-for="item in wishlistItems" :key="item.id">
+        <li>
+<div class="top-product">
+          <div class="main-product">
+          <img :src="item.imageSrc" alt="">
+          <div class="product-cardsss">
+            <div class="product-cont">
+            <h2 x-text="item.title"></h2>
+            <h3 x-text="item.price"></h3>
+            </div>
+            <p x-text="item.description"></p>
+          </div>
+          </div>
+         <div class="wishlist-button">
+          <div class="cat-btn">
+            <p x-text="item.variant"></p>
+
+         <button  @click.debounce="addtocart(item.id) "
+         >Add to Basket</button>
+         <button class="remove-wishlist" @click.debounce="addToWishlist(item.id)">Remove Wishlist</button>
+        <span  @click.debounce="addToWishlist(item.id)">
+    <svg class="wishlist-inspire__icon--svg" viewBox="0 0 24 24" stroke-width="2" stroke="#000" :fill="wishlisted ? '#000': '#fff' ">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.73 2 12.27 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.77-3.4 7.23-8.55 11.53L12 21.35z"/>
+    </svg>
+  </span>
+        </div>
+          </div>
+          </div>
+        </li>
+      </template>
+    </ul>
+  </div>
+  {% else %}
+  <p>Please log in to view your wishlist.</p>
+  {% endif %}
+  
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  
+  <script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('wishlist', () => ({
+    appUrl: "https://programming-di-swedish-hey.trycloudflare.com/",
+    wishlistItems: [], // Initialize an empty array to store wishlist items
+
+    async init() {
+      try {
+        // Fetch wishlist items for the logged-in customer
+        const response = await fetch(this.appUrl + "api/wishlist?customerId={{ customer.id }}&shop={{ shop.permanent_domain }}");
+        const result = await response.json();
+
+        if (result.data && result.data.length > 0) {
+          const productIds = result.data.map(item => item.productId);
+
+          // Define the fetchProductDetails function
+          const fetchProductDetails = async (productIds) => {
+            try {
+              const url = `https://{{ shop.permanent_domain }}/admin/api/2024-01/products.json?ids=${productIds.join(',')}`;
+              const response = await fetch(url, {
+                headers: {
+                  'X-Shopify-Access-Token': 'shpua_e4cf7e18a53ddbc3574faa2552ba1cb6' // Replace with your Shopify API access token
+                }
+              });
+
+              if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.statusText}`);
+              }
+              this.updateHeaderIcons();
+              const productsResult = await response.json();
+              const stripHtml = (html) => html.replace(/<[^>]*>/g, '').trim();
+
+              return productsResult.products.map(product => ({
+                id: product.id,
+                title: product.title,
+                imageSrc: product.images[0] ? product.images[0].src : '', // Take the first image or an empty string if none
+                description: stripHtml(product.body_html), // Product description in HTML
+                price: product.variants[0].price,
+              }));
+            } catch (error) {
+              console.error('Error fetching products:', error);
+              return [];
+            }
+          };
+
+          // Fetch details for all products and update wishlistItems
+          this.wishlistItems = await fetchProductDetails(productIds);
+        }
+      } catch (error) {
+        console.error('Error fetching wishlist:', error);
+      }
+    },
+
+    async addToWishlist(itemId) {
+      {% unless customer %}
+        alert('Please login to add to wishlist');
+        return;
+      {% endunless %}
+
+      const formdata = new FormData();
+      formdata.append("customerId", "{{ customer.id }}");
+      formdata.append("productId", itemId);
+      formdata.append("shop", "{{ shop.permanent_domain }}");
+
+      const action = "DELETE";
+      formdata.append("_action", action);
+
+      const requestOptions = {
+        method: 'POST',
+        body: formdata,
+        redirect: 'follow'
+      };
+
+      fetch(`${this.appUrl}api/wishlist`, requestOptions)
+        .then(response => response.json())
+        .then(result => {
+          this.wishlisted = result.wishlisted;
+          location.reload(); // Optionally refresh the page to reflect the change
+        })
+        .catch(error => console.log('Error updating wishlist:', error));
+    },
+
+    async addtocart(productId) {
+  try {
+    // Fetch the product details to get the variant ID
+    const url = `https://{{ shop.permanent_domain }}/admin/api/2024-01/products/${productId}.json`;
+    const response = await fetch(url, {
+      headers: {
+        'X-Shopify-Access-Token': 'shpua_e4cf7e18a53ddbc3574faa2552ba1cb6' // Your Shopify Admin API access token
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch product details: ${response.statusText}`);
+    }
+
+    const product = await response.json();
+
+    // Check if the product has variants and fetch the first variant ID
+    const variantId = product.product.variants[0].id;
+
+    // Add the variant to the cart
+    const cartResponse = await fetch('/cart/add.js', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        id: variantId,
+        quantity: 1 // Change this if you want to add more than one item
+      })
+    });
+
+    const cartData = await cartResponse.json();
+
+    if (cartResponse.ok) {
+      // Remove from wishlist after successful addition to cart
+      await this.addToWishlist(productId);
+
+      // Refresh the page to reflect changes
+      location.reload();
+    } else {
+      alert('Error adding product to cart: ' + cartData.message);
+    }
+  } catch (error) {
+    console.error('Error adding product to cart:', error);
+    alert('Error adding product to cart.');
+  }
+},
+
+updateHeaderIcons() {
+
+const headerIcons = document.querySelector('.header__icons');
+if (!headerIcons) {
+    console.log('No header__icons element found');
+    return;
+}
+
+console.log('Updating header icons, wishlisted:');
+
+let iconDiv = headerIcons.querySelector('.wishlist-inspire__icon');
+
+    if (!iconDiv) {
+        iconDiv = document.createElement('div');
+        iconDiv.classList.add('wishlist-inspire__icon');
+        iconDiv.innerHTML = `
+       
+        <a href="/pages/wishlist">
+            <svg class="wishlist-inspire__icon--svg" viewBox="0 0 24 24" stroke-width="2" stroke="#CF112C" style="fill:'none'}">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.73 2 12.27 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.77-3.4 7.23-8.55 11.53L12 21.35z"/>
+            </svg>
+            </a>
+         
+        `;
+        headerIcons.appendChild(iconDiv);
+        console.log('Updating header');
+
+    }
+
+}
+
+
+
+  }));
+});
+</script>
+
+  
+  <style>
+.product-wish .main-product {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 30px;
+}
+.product-wish  .top-product {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid gainsboro;
+}
+.product-wish li {
+list-style: none;
+}
+.product-cardsss h2 {
+  font-size: 22px;
+    color: #000;
+    margin: 8px 0;
+    font-weight: 600;
+    margin-bottom: 6px;
+    margin-top: 0;
+}
+.product-cardsss h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #000;
+    letter-spacing: 0;
+    margin-bottom: 6px;
+    margin-top: 0;
+}
+.product-wish img {
+    width: 100%;
+    max-width: 100%;
+    height: 140px;
+    object-fit: contain;
+    max-width: 100px;
+}
+.product-cardsss p {
+  color: #000;
+    letter-spacing: 0.5px;
+    line-height: normal;
+    text-transform: capitalize;
+    font-weight: 500;
+    width:85%;
+    margin: 0;
+    word-wrap: break-word;
+}
+.product-cont {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.cat-btn {
+    display: flex;
+    justify-content: flex-start;
+    align-items: end;
+    gap: 30px;
+}
+.wishlist-button svg.wishlist-inspire__icon--svg {
+    width: 25px;
+    height: 25px;
+    fill: #CF112C;
+    stroke: #CF112C;
+    cursor: pointer;
+}
+.cat-btn button {
+  padding: 14px 18px;
+    border-radius: 40px;
+    background: #CF112C;
+    border: 1px solid #CF112C;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: normal;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+}
+.product-cardsss {
+    width: 570px;
+}
+.main-page-title.page-title.h0.scroll-trigger.animate--fade-in {
+    display: none;
+}
+  .wishlist-inspire__icon{
+    display: flex;
+    justify-content: center;
+    max-width: 44rem;
+  }
+  .wishlist-inspire__icon button{
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .wishlist-inspire__icon--svg{
+    width: 2rem;
+    height: 2rem;
+  }
+  .header .header__icons {
+    align-items: center;
+}
+.header .wishlist-inspire__icon {
+    order: 3;
+}
+.header .wishlist-inspire__icon a { 
+    display: grid;
+}
+.header .wishlist-inspire__icon--svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    fill: #CF112C;
+    vertical-align: middle;
+    stroke-width: 1;
+}
+a#cart-icon-bubble {
+    order: 4;
+}
+
+
+@media (max-width: 767px){
+  .product-cont {
+    flex-wrap: wrap;
+}
+.product-wish .main-product {
+    gap: 5px;
+}
+.product-cardsss h2 {
+    font-size: 14px;
+}
+.product-wish img {
+    height: 100px;
+}
+.product-cardsss {
+    width: 170px;
+}
+.cat-btn button {
+  padding: 6px 7px;
+        border-radius: 40px;
+        background: #CF112C;
+        border: 1px solid #CF112C;
+        color: #fff;
+        font-size: 9px;
+}
+.cat-btn {
+    gap: 5px;
+}
+.product-wish ul {
+    padding-left: 0;
+}
+.product-cardsss h3 {
+    font-size: 13px;
+}
+.product-wish  .top-product {
+    gap: 5px;
+}
+.wishlist-button svg.wishlist-inspire__icon--svg {
+    width: 20px;
+    height: 20px;
+    align-items: flex-start;
+    }
+}
+  </style>
+  
+  {% schema %}
+  {
+    "name": "Wishlist Section",
+    "target": "section",
+    "settings": [
+      {
+        "type": "product",
+        "id": "product",
+        "label": "Product",
+        "autofill": true
+      },
+      {
+        "type": "text",
+        "id": "text",
+        "label": "Button Text",
+        "default": "Add to wishlist"
+      },
+      {
+        "type": "color",
+        "id": "colour",
+        "label": "Icon Colour",
+        "default": "#ff0000"
+      }
+    ]
+  }
+  {% endschema %}
+  
