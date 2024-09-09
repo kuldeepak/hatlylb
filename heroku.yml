@@ -2,4 +2,4 @@ bulid:
   docker:
     web:Dockerfile
   config:
-  SHOPIFY_API_KEY=03b0ba33fb1153d8789c4dd19b3076fe
+  SHOPIFY_API_KEY: 03b0ba33fb1153d8789c4dd19b3076fe
